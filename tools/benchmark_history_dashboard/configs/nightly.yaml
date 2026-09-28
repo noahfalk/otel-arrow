@@ -1,0 +1,246 @@
+version: 1
+target_branch: benchmarks
+site_root: docs/benchmarks/nightly
+migration_script: nightly_migrations.py
+orchestrator_root: tools/pipeline_perf_test
+
+metric_sets:
+  standard_logs:
+    - name: dropped_logs_percentage
+      unit: "%"
+      mock: {min: 0, max: 1}
+    - name: cpu_percentage_normalized_avg
+      unit: "%"
+      mock: {min: 20, max: 70}
+    - name: cpu_percentage_normalized_max
+      unit: "%"
+      mock: {min: 40, max: 95}
+    - name: ram_mib_avg
+      unit: MiB
+      mock: {min: 100, max: 300}
+    - name: ram_mib_max
+      unit: MiB
+      mock: {min: 150, max: 350}
+    - name: logs_produced_rate
+      unit: logs/sec
+      mock: {min: 90000, max: 110000}
+    - name: logs_received_rate
+      unit: logs/sec
+      mock: {min: 89000, max: 110000}
+    - name: test_duration
+      unit: seconds
+      mock: {min: 55, max: 65}
+    - name: network_tx_bytes_rate_avg
+      unit: bytes/sec
+      mock: {min: 1000000, max: 5000000}
+    - name: network_rx_bytes_rate_avg
+      unit: bytes/sec
+      mock: {min: 1000000, max: 5000000}
+    - name: egress_bytes_per_log
+      unit: bytes/log
+      mock: {min: 100, max: 500}
+    - name: uncompressed_bytes_per_log
+      unit: bytes/log
+      mock: {min: 200, max: 1000}
+
+  clickhouse:
+    - name: logs_produced_rate
+      unit: logs/sec
+      mock: {min: 400000, max: 600000}
+    - name: log_rows_written_rate
+      unit: rows/sec
+      mock: {min: 390000, max: 600000}
+    - name: df-engine_cpu_percentage_normalized_avg
+      unit: "%"
+      mock: {min: 30, max: 80}
+    - name: clickhouse_cpu_percentage_normalized_avg
+      unit: "%"
+      mock: {min: 20, max: 70}
+    - name: df-engine_ram_mib_max
+      unit: MiB
+      mock: {min: 150, max: 400}
+    - name: clickhouse_ram_mib_max
+      unit: MiB
+      mock: {min: 300, max: 900}
+    - name: go-collector_cpu_percentage_normalized_avg
+      unit: "%"
+      mock: {min: 30, max: 90}
+    - name: go-collector_ram_mib_max
+      unit: MiB
+      mock: {min: 150, max: 500}
+    - name: test_duration
+      unit: seconds
+      mock: {min: 55, max: 65}
+
+  idle_state:
+    - name: idle_cpu_percentage_avg
+      unit: "%"
+      mock: {min: 0, max: 5}
+    - name: idle_cpu_percentage_max
+      unit: "%"
+      mock: {min: 1, max: 10}
+    - name: idle_ram_mib_avg
+      unit: MiB
+      mock: {min: 50, max: 250}
+    - name: idle_ram_mib_max
+      unit: MiB
+      mock: {min: 60, max: 300}
+    - name: idle_test_duration
+      unit: seconds
+      mock: {min: 55, max: 65}
+    - name: idle_rss_mib_avg
+      unit: MiB
+      mock: {min: 40, max: 240}
+    - name: idle_rss_mib_max
+      unit: MiB
+      mock: {min: 50, max: 280}
+
+  scaling_efficiency:
+    - name: scaling_efficiency_2_cores
+      unit: ""
+      mock: {min: 0.85, max: 1}
+    - name: scaling_efficiency_4_cores
+      unit: ""
+      mock: {min: 0.8, max: 1}
+    - name: scaling_efficiency_8_cores
+      unit: ""
+      mock: {min: 0.75, max: 1}
+    - name: scaling_efficiency_16_cores
+      unit: ""
+      mock: {min: 0.7, max: 1}
+    - name: scaling_efficiency_avg
+      unit: ""
+      mock: {min: 0.8, max: 1}
+
+  idle_memory_scaling:
+    - name: idle_memory_constant_overhead_mib
+      unit: MiB
+      mock: {min: 40, max: 100}
+    - name: idle_memory_per_core_overhead_mib
+      unit: MiB
+      mock: {min: 2, max: 10}
+    - name: idle_memory_r_squared
+      unit: ""
+      mock: {min: 0.95, max: 1}
+    - name: idle_memory_1core_mib
+      unit: MiB
+      mock: {min: 50, max: 120}
+    - name: idle_memory_2core_mib
+      unit: MiB
+      mock: {min: 55, max: 140}
+    - name: idle_memory_4core_mib
+      unit: MiB
+      mock: {min: 60, max: 180}
+    - name: idle_memory_8core_mib
+      unit: MiB
+      mock: {min: 70, max: 240}
+    - name: idle_memory_16core_mib
+      unit: MiB
+      mock: {min: 90, max: 360}
+    - name: idle_memory_32core_mib
+      unit: MiB
+      mock: {min: 130, max: 600}
+
+benchmarks:
+  - name: syslog
+    facets: {os: linux, engine: dfe}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/nightly/syslog-docker.yaml
+
+  - name: syslog-tcp
+    facets: {os: linux, engine: dfe}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/nightly/syslog-tcp-docker.yaml
+
+  - name: standardload-batch-size
+    facets: {os: linux, engine: dfe}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/nightly/100klrps-batch-sizes-docker.yaml
+
+  - name: backpressure
+    facets: {os: linux, engine: dfe}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/nightly/backpressure-docker.yaml
+
+  - name: filter
+    facets: {os: linux}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - name: dfe
+        path: test_suites/integration/nightly/filter-docker.yaml
+        facets: {engine: dfe}
+      - name: otelcol
+        path: test_suites/integration/nightly/otelcol-docker.yaml
+        facets: {engine: otelcol}
+
+  - name: syslog-tcp-otelcol
+    facets: {os: linux, engine: otelcol}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/nightly/syslog-tcp-otelcol-docker.yaml
+
+  - name: batch-processor
+    facets: {os: linux, engine: dfe}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/nightly/batch-processor-docker.yaml
+
+  - name: clickhouse
+    facets: {os: linux}
+    metric_sets: [clickhouse]
+    orchestrators:
+      - name: dfe
+        path: test_suites/integration/clickhouse/otap-clickhouse-logs.yaml
+        facets: {engine: dfe}
+        tests:
+          - OTAP-IN-BATCHED-100K
+          - OTLP-IN-BATCHED-100K
+      - name: otelcol
+        path: test_suites/integration/clickhouse/otelcol-clickhouse-logs.yaml
+        facets: {engine: otelcol}
+
+  - name: idle-state
+    facets: {os: linux, engine: dfe}
+    metric_sets: [idle_state]
+    orchestrators:
+      - path: test_suites/integration/continuous/idle-state-docker.yaml
+      - path: test_suites/integration/continuous/idle-state-2cores-docker.yaml
+      - path: test_suites/integration/continuous/idle-state-4cores-docker.yaml
+      - path: test_suites/integration/continuous/idle-state-8cores-docker.yaml
+      - path: test_suites/integration/continuous/idle-state-16cores-docker.yaml
+      - path: test_suites/integration/continuous/idle-state-32cores-docker.yaml
+
+  - name: idle-memory-scaling
+    facets: {os: linux, engine: dfe}
+    metric_sets: [idle_memory_scaling]
+
+  - name: saturation
+    facets: {os: linux, engine: dfe}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/continuous/saturation-1core.yaml
+      - path: test_suites/integration/continuous/saturation-2cores.yaml
+      - path: test_suites/integration/continuous/saturation-4cores.yaml
+      - path: test_suites/integration/continuous/saturation-8cores.yaml
+      - path: test_suites/integration/continuous/saturation-16cores.yaml
+      - path: test_suites/integration/continuous/saturation-otap-1core.yaml
+      - path: test_suites/integration/continuous/saturation-otap-2cores.yaml
+      - path: test_suites/integration/continuous/saturation-otap-4cores.yaml
+      - path: test_suites/integration/continuous/saturation-otap-8cores.yaml
+      - path: test_suites/integration/continuous/saturation-max-throughput.yaml
+      - path: test_suites/integration/continuous/saturation-max-throughput-otap.yaml
+
+  - name: scaling-efficiency
+    facets: {os: linux, engine: dfe}
+    metric_sets: [scaling_efficiency]
+
+  - name: passthrough
+    facets: {os: linux, engine: dfe}
+    metric_sets: [standard_logs]
+    orchestrators:
+      - path: test_suites/integration/continuous/passthrough.yaml
+      - path: test_suites/integration/continuous/passthrough-otap.yaml

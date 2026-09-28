@@ -1,0 +1,48 @@
+version: 1
+target_branch: benchmarks
+site_root: docs/benchmarks
+migration_script: continuous_migrations.py
+orchestrator_root: tools/pipeline_perf_test
+
+metric_sets:
+  continuous_logs:
+    - name: dropped_logs_percentage
+      unit: "%"
+      mock: {min: 0, max: 10}
+    - name: cpu_percentage_normalized_avg
+      unit: "%"
+      mock: {min: 20, max: 70}
+    - name: cpu_percentage_normalized_max
+      unit: "%"
+      mock: {min: 30, max: 90}
+    - name: ram_mib_avg
+      unit: MiB
+      mock: {min: 10, max: 40}
+    - name: ram_mib_max
+      unit: MiB
+      mock: {min: 15, max: 50}
+    - name: logs_produced_rate
+      unit: logs/sec
+      mock: {min: 90000, max: 110000}
+    - name: logs_received_rate
+      unit: logs/sec
+      mock: {min: 85000, max: 110000}
+    - name: test_duration
+      unit: seconds
+      mock: {min: 18, max: 22}
+    - name: network_tx_bytes_rate_avg
+      unit: bytes/sec
+      mock: {min: 700000, max: 3500000}
+    - name: network_rx_bytes_rate_avg
+      unit: bytes/sec
+      mock: {min: 700000, max: 3500000}
+    - name: egress_bytes_per_log
+      unit: bytes/log
+      mock: {min: 8, max: 40}
+
+benchmarks:
+  - name: continuous
+    facets: {os: linux, engine: dfe}
+    metric_sets: [continuous_logs]
+    orchestrators:
+      - path: test_suites/integration/continuous/100klrps-docker.yaml

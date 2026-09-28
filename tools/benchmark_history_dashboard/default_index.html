@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Benchmark history</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f8fa;
+        color: #1f2328;
+      }
+      body {
+        margin: 0;
+      }
+      header, main, footer {
+        box-sizing: border-box;
+        margin: 0 auto;
+        max-width: 1500px;
+        padding: 20px 28px;
+      }
+      header {
+        background: #24292f;
+        color: #fff;
+        max-width: none;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 2rem;
+      }
+      .metadata {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        font-size: 0.9rem;
+      }
+      header a {
+        color: #79c0ff;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        align-items: start;
+        gap: 20px;
+      }
+      #filters {
+        position: sticky;
+        top: 20px;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        padding: 16px;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        background: #fff;
+      }
+      #filters h2 {
+        margin: 0 0 12px;
+        font-size: 1.1rem;
+      }
+      .facet-filter {
+        margin: 0 0 16px;
+        padding: 0;
+        border: 0;
+      }
+      .facet-filter:last-of-type {
+        margin-bottom: 8px;
+      }
+      .facet-filter legend {
+        margin-bottom: 5px;
+        padding: 0;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .facet-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        margin: 4px 0;
+        font-size: 0.82rem;
+        overflow-wrap: anywhere;
+      }
+      .facet-option input {
+        flex: none;
+        margin: 3px 0 0;
+      }
+      button {
+        border: 1px solid #8c959f;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      #summary {
+        color: #57606a;
+        font-size: 0.85rem;
+        padding-top: 8px;
+        border-top: 1px solid #d0d7de;
+      }
+      #charts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 620px), 1fr));
+        gap: 18px;
+      }
+      .chart-card {
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgb(31 35 40 / 8%);
+      }
+      .chart-card h2 {
+        margin: 0 0 12px;
+        font-size: 1.1rem;
+        overflow-wrap: anywhere;
+      }
+      .chart-wrapper {
+        position: relative;
+        height: 340px;
+      }
+      #empty {
+        display: none;
+        padding: 50px;
+        text-align: center;
+        color: #57606a;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #57606a;
+        font-size: 0.85rem;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          background: #0d1117;
+          color: #e6edf3;
+        }
+        header {
+          background: #161b22;
+          border-bottom: 1px solid #30363d;
+        }
+        #filters, .chart-card {
+          background: #161b22;
+          border-color: #30363d;
+        }
+        button {
+          color: #e6edf3;
+          background: #21262d;
+          border-color: #8b949e;
+        }
+        #summary {
+          border-color: #30363d;
+        }
+        #summary, #empty, footer {
+          color: #8b949e;
+        }
+      }
+      @media (max-width: 800px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        #filters {
+          position: static;
+          max-height: none;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 0 16px;
+        }
+        #filters h2, #summary {
+          grid-column: 1 / -1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 id="title">Benchmark history</h1>
+      <div class="metadata">
+        <span><strong>Last update:</strong> <span id="last-update"></span></span>
+        <span><strong>Repository:</strong> <a id="repository-link" rel="noopener"></a></span>
+      </div>
+    </header>
+    <main>
+      <aside id="filters" aria-label="Benchmark filters">
+        <h2>Filters</h2>
+      </aside>
+      <div id="results">
+        <section id="charts"></section>
+        <div id="empty">No benchmark data matches the selected facets.</div>
+      </div>
+    </main>
+    <footer>
+      <button id="download-button">Download JSON</button>
+      <span>Aggregate benchmark history grouped and filtered by structured facets.</span>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <script src="data.js"></script>
+    <script>
+      "use strict";
+      (() => {
+        const data = window.BENCHMARK_DATA;
+        const preferredFacetOrder = [
+          "os", "engine", "signal", "protocol", "cores", "suite", "scenario"
+        ];
+        const charts = [];
+
+        function inferLegacyFacets(extra) {
+          if (!extra || !extra.includes("/")) return {};
+          const slash = extra.indexOf("/");
+          const separator = extra.lastIndexOf(" - ");
+          if (separator <= slash) return {};
+          return {
+            suite: extra.slice(0, slash),
+            scenario: extra.slice(slash + 1, separator)
+          };
+        }
+
+        function normalizedFacets(bench) {
+          return Object.assign({}, inferLegacyFacets(bench.extra), bench.facets || {});
+        }
+
+        function collectRecords() {
+          const records = [];
+          const entries = [];
+          for (const entrySet of Object.values(data.entries || {})) {
+            for (const entry of entrySet) {
+              const entryIndex = entries.length;
+              entries.push(entry);
+              for (const bench of entry.benches || []) {
+                records.push({
+                  bench,
+                  entry,
+                  entryIndex,
+                  facets: normalizedFacets(bench)
+                });
+              }
+            }
+          }
+          return {records, entries};
+        }
+
+        function facetKeys(records) {
+          const keys = new Set();
+          records.forEach(record => Object.keys(record.facets).forEach(key => keys.add(key)));
+          return [...keys].sort((a, b) => {
+            const ai = preferredFacetOrder.indexOf(a);
+            const bi = preferredFacetOrder.indexOf(b);
+            if (ai !== -1 || bi !== -1) {
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            }
+            return a.localeCompare(b);
+          });
+        }
+
+        function colorFor(label) {
+          let hash = 0;
+          for (let index = 0; index < label.length; index++) {
+            hash = ((hash << 5) - hash + label.charCodeAt(index)) | 0;
+          }
+          return `hsl(${Math.abs(hash) % 360}, 65%, 48%)`;
+        }
+
+        function seriesLabel(facets) {
+          const parts = facetKeys([{facets}]).map(key => `${key}=${facets[key]}`);
+          return parts.join(", ") || "all results";
+        }
+
+        function selectedFacets() {
+          const selected = new Map();
+          for (const checkbox of document.querySelectorAll(
+            "#filters input[type=checkbox]:checked"
+          )) {
+            if (!selected.has(checkbox.dataset.facet)) {
+              selected.set(checkbox.dataset.facet, new Set());
+            }
+            selected.get(checkbox.dataset.facet).add(checkbox.value);
+          }
+          return selected;
+        }
+
+        function matchesFilters(record, selected) {
+          return [...selected.entries()].every(
+            ([key, selectedValues]) =>
+              record.facets[key] === undefined ||
+              selectedValues.has(record.facets[key])
+          );
+        }
+
+        function renderFilters(records, render) {
+          const container = document.getElementById("filters");
+          for (const key of facetKeys(records)) {
+            const values = [...new Set(
+              records.map(record => record.facets[key]).filter(Boolean)
+            )].sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+            const group = document.createElement("fieldset");
+            group.className = "facet-filter";
+            const heading = document.createElement("legend");
+            heading.textContent = key.replaceAll("_", " ");
+            group.appendChild(heading);
+            for (const value of values) {
+              const option = document.createElement("label");
+              option.className = "facet-option";
+              const checkbox = document.createElement("input");
+              checkbox.type = "checkbox";
+              checkbox.dataset.facet = key;
+              checkbox.value = value;
+              checkbox.addEventListener("change", render);
+              const text = document.createElement("span");
+              text.textContent = value;
+              option.append(checkbox, text);
+              group.appendChild(option);
+            }
+            container.appendChild(group);
+          }
+          const summary = document.createElement("div");
+          summary.id = "summary";
+          container.appendChild(summary);
+        }
+
+        function renderCharts(records, entries) {
+          charts.splice(0).forEach(chart => chart.destroy());
+          const container = document.getElementById("charts");
+          container.replaceChildren();
+          const selected = selectedFacets();
+          const visible = records.filter(record => matchesFilters(record, selected));
+          document.getElementById("summary").textContent =
+            `${visible.length.toLocaleString()} measurements`;
+
+          const metrics = new Map();
+          visible.forEach(record => {
+            const key = `${record.bench.name}\u0000${record.bench.unit}`;
+            if (!metrics.has(key)) metrics.set(key, []);
+            metrics.get(key).push(record);
+          });
+
+          for (const [metricKey, metricRecords] of [...metrics.entries()].sort()) {
+            const [name, unit] = metricKey.split("\u0000");
+            const series = new Map();
+            metricRecords.forEach(record => {
+              const label = seriesLabel(record.facets);
+              if (!series.has(label)) series.set(label, []);
+              series.get(label).push(record);
+            });
+
+            const card = document.createElement("article");
+            card.className = "chart-card";
+            const heading = document.createElement("h2");
+            heading.textContent = name;
+            const wrapper = document.createElement("div");
+            wrapper.className = "chart-wrapper";
+            const canvas = document.createElement("canvas");
+            wrapper.appendChild(canvas);
+            card.append(heading, wrapper);
+            container.appendChild(card);
+
+            const datasets = [...series.entries()].map(([label, values]) => {
+              const byEntry = new Map(values.map(value => [value.entryIndex, value]));
+              const color = colorFor(label);
+              return {
+                label,
+                borderColor: color,
+                backgroundColor: color.replace(")", ", 0.15)").replace("hsl", "hsla"),
+                fill: false,
+                spanGaps: true,
+                data: entries.map((_entry, index) => {
+                  const record = byEntry.get(index);
+                  return record ? record.bench.value : null;
+                }),
+                records: byEntry
+              };
+            });
+
+            charts.push(new Chart(canvas, {
+              type: "line",
+              data: {
+                labels: entries.map(entry => entry.commit.id.slice(0, 7)),
+                datasets
+              },
+              options: {
+                maintainAspectRatio: false,
+                interaction: {mode: "nearest", intersect: false},
+                scales: {
+                  xAxes: [{scaleLabel: {display: true, labelString: "commit"}}],
+                  yAxes: [{
+                    scaleLabel: {display: true, labelString: unit},
+                    ticks: {beginAtZero: true}
+                  }]
+                },
+                tooltips: {
+                  callbacks: {
+                    title: items => {
+                      const entry = entries[items[0].index];
+                      return `${entry.commit.id.slice(0, 7)} - ${entry.commit.message}`;
+                    },
+                    label: item => {
+                      const dataset = datasets[item.datasetIndex];
+                      return `${dataset.label}: ${item.yLabel} ${unit}`.trim();
+                    },
+                    afterLabel: item => {
+                      const record = datasets[item.datasetIndex].records.get(item.index);
+                      if (!record) return "";
+                      return record.bench.description || record.bench.extra || "";
+                    }
+                  }
+                },
+                onClick: (_event, active) => {
+                  if (active.length) {
+                    window.open(entries[active[0]._index].commit.url, "_blank");
+                  }
+                }
+              }
+            }));
+          }
+
+          document.getElementById("empty").style.display =
+            metrics.size ? "none" : "block";
+        }
+
+        const {records, entries} = collectRecords();
+        const pathName = decodeURIComponent(location.pathname)
+          .split("/").filter(Boolean).pop() || "Benchmark";
+        const title = pathName.replaceAll("-", " ")
+          .replace(/\b\w/g, character => character.toUpperCase());
+        document.title = `${title} benchmark history`;
+        document.getElementById("title").textContent = title;
+        document.getElementById("last-update").textContent =
+          new Date(data.lastUpdate).toLocaleString();
+        const repositoryLink = document.getElementById("repository-link");
+        repositoryLink.href = data.repoUrl;
+        repositoryLink.textContent = data.repoUrl;
+        document.getElementById("download-button").addEventListener("click", () => {
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(
+            new Blob([JSON.stringify(data, null, 2)], {type: "application/json"})
+          );
+          link.download = "benchmark-data.json";
+          link.click();
+          URL.revokeObjectURL(link.href);
+        });
+        renderFilters(records, () => renderCharts(records, entries));
+        renderCharts(records, entries);
+      })();
+    </script>
+  </body>
+</html>

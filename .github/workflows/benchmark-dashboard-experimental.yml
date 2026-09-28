@@ -1,0 +1,154 @@
+name: Experimental Benchmark Dashboard
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-dashboard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  mock-results:
+    name: Mock results (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dashboard dependencies
+        run: python -m pip install --require-hashes -r tools/benchmark_history_dashboard/requirements.lock.txt
+
+      - name: Generate ${{ matrix.os }} mock results
+        run: >-
+          python tools/benchmark_history_dashboard/dashboard.py mock-run
+          --config tools/benchmark_history_dashboard/configs/nightly.yaml
+          --new-results benchmark-results
+          --result-group ${{ matrix.os }}
+          --facet os=${{ matrix.os }}
+
+      - name: Upload ${{ matrix.os }} benchmark results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-results-${{ matrix.os }}
+          path: benchmark-results
+          if-no-files-found: error
+          retention-days: 7
+
+  build-dashboard:
+    name: Build dashboard and patch
+    needs: mock-results
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dashboard dependencies
+        run: python -m pip install --require-hashes -r tools/benchmark_history_dashboard/requirements.lock.txt
+
+      - name: Download benchmark result artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: benchmark-results-*
+          merge-multiple: true
+          path: benchmark-results
+
+      - name: Build candidate dashboard site
+        run: >-
+          python tools/benchmark_history_dashboard/dashboard.py build
+          --config tools/benchmark_history_dashboard/configs/nightly.yaml
+          --new-results benchmark-results
+          --output-dir benchmark-dashboard-site
+          --source-ref ${{ github.event.pull_request.head.sha }}
+          --repo-url ${{ github.server_url }}/${{ github.repository }}
+
+      - name: Generate proposed benchmarks-branch patch
+        run: >-
+          python tools/benchmark_history_dashboard/dashboard.py update-branch
+          --config tools/benchmark_history_dashboard/configs/nightly.yaml
+          --new-results benchmark-results
+          --patch-output benchmark-dashboard.patch
+          --source-ref ${{ github.event.pull_request.head.sha }}
+          --repo-url ${{ github.server_url }}/${{ github.repository }}
+          --git-user-name github-actions[bot]
+          --git-user-email 41898282+github-actions[bot]@users.noreply.github.com
+          --additional-commit-remarks
+          "Experimental output from pull request #${{ github.event.pull_request.number }}."
+
+      - name: Upload dashboard site
+        id: upload-site
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-dashboard-site
+          path: benchmark-dashboard-site
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload benchmarks patch
+        id: upload-patch
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-dashboard-patch
+          path: benchmark-dashboard.patch
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Write evaluation instructions
+        env:
+          SITE_URL: ${{ steps.upload-site.outputs.artifact-url }}
+          PATCH_URL: ${{ steps.upload-patch.outputs.artifact-url }}
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Experimental benchmark dashboard
+
+          - [Download the generated dashboard site]($SITE_URL)
+          - [Download the proposed benchmarks-branch patch]($PATCH_URL)
+
+          ### View the site locally
+
+          Extract the site artifact, then run:
+
+          \`\`\`text
+          python -m http.server 8000 --directory <site-directory>
+          \`\`\`
+
+          Open http://localhost:8000/.
+
+          ### Inspect the proposed benchmarks-branch commits
+
+          Start from a synchronized copy of the fork's benchmarks branch:
+
+          \`\`\`text
+          git fetch origin benchmarks
+          git switch --create benchmark-dashboard-review origin/benchmarks
+          git am <path-to-downloaded-patch>
+          \`\`\`
+
+          \`git am\` applies the patch and creates its commits on the disposable
+          review branch. The patch preserves the separate migration and
+          benchmark-history commits that would be created by a real update.
+          EOF
