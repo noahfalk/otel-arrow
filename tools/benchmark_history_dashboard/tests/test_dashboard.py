@@ -5,14 +5,11 @@ from __future__ import annotations
 
 import json
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 TOOL_DIR = Path(__file__).resolve().parents[1]
@@ -2548,61 +2545,6 @@ migration_script: nightly_migrations.py
                     "the following arguments are required: --config",
                     result.stderr,
                 )
-
-    # Scenario: A generated site is served for local dashboard inspection.
-    # Guarantees: The serve command returns site files and disables caching for data.js.
-    def test_serve_hosts_generated_site(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            output = root / "output"
-            output.mkdir()
-            (output / "index.html").write_text("dashboard", encoding="utf-8")
-            (output / "data.js").write_text("history", encoding="utf-8")
-            script = TOOL_DIR / "dashboard.py"
-            with socket.socket() as available:
-                available.bind(("127.0.0.1", 0))
-                port = available.getsockname()[1]
-
-            server = subprocess.Popen(
-                [
-                    sys.executable,
-                    str(script),
-                    "serve",
-                    "--output-dir",
-                    str(output),
-                    "--port",
-                    str(port),
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            try:
-                deadline = time.monotonic() + 10
-                while True:
-                    try:
-                        with urllib.request.urlopen(
-                            f"http://127.0.0.1:{port}/data.js",
-                            timeout=1,
-                        ) as response:
-                            body = response.read().decode("utf-8")
-                            cache_control = response.headers.get("Cache-Control")
-                        break
-                    except (urllib.error.URLError, TimeoutError):
-                        if server.poll() is not None or time.monotonic() >= deadline:
-                            stdout, stderr = server.communicate(timeout=5)
-                            self.fail(
-                                "Dashboard server did not become available.\n"
-                                f"stdout:\n{stdout}\nstderr:\n{stderr}"
-                            )
-                        time.sleep(0.05)
-            finally:
-                if server.poll() is None:
-                    server.terminate()
-                server.communicate(timeout=5)
-
-            self.assertEqual(body, "history")
-            self.assertEqual(cache_control, "no-store")
 
     @staticmethod
     def _commit_all(repo: Path, message: str) -> None:

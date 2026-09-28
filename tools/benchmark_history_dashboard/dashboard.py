@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, publish, or serve the benchmark history dashboard."""
+"""Build or publish the benchmark history dashboard."""
 
 from __future__ import annotations
 
@@ -12,8 +12,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from functools import partial
-from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
 from history import (
@@ -900,32 +898,6 @@ def cmd_update_branch(args: argparse.Namespace) -> int:
     raise PublisherError(f"Push was rejected after {args.max_attempts} attempts")
 
 
-class DashboardHandler(SimpleHTTPRequestHandler):
-    def end_headers(self) -> None:
-        if self.path.endswith("data.js"):
-            self.send_header("Cache-Control", "no-store")
-        super().end_headers()
-
-
-def cmd_serve(args: argparse.Namespace) -> int:
-    output_dir = args.output_dir.resolve()
-    if not output_dir.is_dir():
-        raise PublisherError(
-            f"Output directory not found: {output_dir}. Run `dashboard.py build` first."
-        )
-
-    handler = partial(DashboardHandler, directory=str(output_dir))
-    server = HTTPServer(("127.0.0.1", args.port), handler)
-    print(f"Serving {output_dir} at http://localhost:{server.server_port}", flush=True)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nShutting down.")
-    finally:
-        server.server_close()
-    return 0
-
-
 def _add_update_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--new-results",
@@ -1183,19 +1155,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_update_arguments(update_branch)
     update_branch.set_defaults(func=cmd_update_branch)
-
-    serve = subcommands.add_parser(
-        "serve",
-        help="Serve a generated dashboard site over HTTP.",
-    )
-    serve.add_argument(
-        "--output-dir",
-        type=Path,
-        default=DEFAULT_OUTPUT_DIR,
-        help=f"Generated site location (default: {DEFAULT_OUTPUT_DIR}).",
-    )
-    serve.add_argument("--port", type=int, default=8000)
-    serve.set_defaults(func=cmd_serve)
     return parser
 
 

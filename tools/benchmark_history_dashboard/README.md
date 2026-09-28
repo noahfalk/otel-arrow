@@ -1,20 +1,18 @@
 # Benchmark History Dashboard
 
-Repository-owned tooling for building, publishing, and locally serving the
-existing `github-action-benchmark` history dashboard format.
+Repository-owned tooling for building and publishing the existing
+`github-action-benchmark` history dashboard format.
 
-The public entrypoint has five commands:
+The public entrypoint has four commands:
 
 ```text
 dashboard.py run
 dashboard.py mock-run
 dashboard.py build
 dashboard.py update-branch
-dashboard.py serve
 ```
 
-All commands except `serve` require `--config`. `serve` operates only on an
-already generated output directory.
+All commands require `--config`.
 
 ## Routing
 
@@ -223,9 +221,7 @@ python tools\benchmark_history_dashboard\dashboard.py build `
 python tools\benchmark_history_dashboard\dashboard.py build `
   --config tools\benchmark_history_dashboard\configs\nightly.yaml
 
-python tools\benchmark_history_dashboard\dashboard.py serve `
-  --output-dir .site `
-  --port 8000
+python -m http.server 8000 --directory .site
 ```
 
 The updater validates every input and existing history before replacing any
@@ -296,8 +292,8 @@ The canonical nightly landing page is stored at
 `configs/nightly/index.html`. Every migration run synchronizes that file to
 `<site_root>/index.html`, replacing a stale copy and doing nothing when the
 files are byte-for-byte identical. Links to dashboards within the nightly site
-are relative so they resolve against both GitHub Pages and the local `serve`
-command. Links outside the nightly site remain absolute.
+are relative so they resolve against both GitHub Pages and a locally hosted
+static site. Links outside the nightly site remain absolute.
 
 When `--repo-dir` is omitted, the command asks Git for the worktree root
 containing the config file. This supports normal repositories, linked
