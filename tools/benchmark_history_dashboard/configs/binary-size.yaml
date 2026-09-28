@@ -1,0 +1,27 @@
+version: 1
+target_branch: benchmarks
+site_root: docs/benchmarks
+migration_script: binary_size_migrations.py
+
+metric_sets:
+  binary_sizes:
+    - name: linux-amd64-binary-size
+      unit: MB
+      facets: {os: linux, architecture: amd64, measurement: binary-size}
+      mock: {min: 100, max: 130}
+    - name: linux-amd64-text-size
+      unit: MB
+      facets: {os: linux, architecture: amd64, measurement: text-size}
+      mock: {min: 70, max: 100}
+    - name: linux-arm64-binary-size
+      unit: MB
+      facets: {os: linux, architecture: arm64, measurement: binary-size}
+      mock: {min: 90, max: 120}
+    - name: linux-arm64-text-size
+      unit: MB
+      facets: {os: linux, architecture: arm64, measurement: text-size}
+      mock: {min: 60, max: 90}
+
+benchmarks:
+  - name: binary-size
+    metric_sets: [binary_sizes]

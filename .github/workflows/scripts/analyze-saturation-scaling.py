@@ -208,7 +208,11 @@ def generate_benchmark_json(throughputs: dict[int, float], efficiencies: dict[in
             "name": f"scaling_efficiency_{cores}_cores",
             "value": round(efficiency, 4),
             "unit": "",
-            "extra": f"Scaling efficiency at {cores} cores (1.0 = perfect linear scaling)"
+            "extra": f"Scaling efficiency at {cores} cores (1.0 = perfect linear scaling)",
+            "facets": {
+                "os": "linux",
+                "cores": str(cores),
+            },
         })
     
     # Add average scaling efficiency (excluding 1-core baseline)
@@ -220,7 +224,10 @@ def generate_benchmark_json(throughputs: dict[int, float], efficiencies: dict[in
             "name": "scaling_efficiency_avg",
             "value": round(avg_efficiency, 4),
             "unit": "",
-            "extra": "Average scaling efficiency across all multi-core tests (1.0 = perfect)"
+            "extra": "Average scaling efficiency across all multi-core tests (1.0 = perfect)",
+            "facets": {
+                "os": "linux",
+            },
         })
     
     return benchmark_data
@@ -289,6 +296,7 @@ def main():
             for entry in benchmark_data:
                 entry["name"] = f"{protocol}_{entry['name']}"
                 entry["extra"] = f"[{protocol.upper()}] {entry['extra']}"
+                entry["facets"]["protocol"] = protocol
             all_benchmark_data.extend(benchmark_data)
     
     if not scenarios_found:

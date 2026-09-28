@@ -213,21 +213,24 @@ def generate_benchmark_json(memory_data: dict[int, float], C: float, R: float, r
         "name": "idle_memory_constant_overhead_mib",
         "value": round(C, 2),
         "unit": "MiB",
-        "extra": "Constant memory overhead (C in Memory = C + N*R)"
+        "extra": "Constant memory overhead (C in Memory = C + N*R)",
+        "facets": {"os": "linux"},
     })
     
     benchmark_data.append({
         "name": "idle_memory_per_core_overhead_mib",
         "value": round(R, 2),
         "unit": "MiB",
-        "extra": "Per-core memory overhead (R in Memory = C + N*R)"
+        "extra": "Per-core memory overhead (R in Memory = C + N*R)",
+        "facets": {"os": "linux"},
     })
     
     benchmark_data.append({
         "name": "idle_memory_r_squared",
         "value": round(r_squared, 4),
         "unit": "",
-        "extra": "Linear fit quality (R²); 1.0 = perfect linear scaling"
+        "extra": "Linear fit quality (R²); 1.0 = perfect linear scaling",
+        "facets": {"os": "linux"},
     })
     
     # Add per-core-count memory readings
@@ -240,7 +243,8 @@ def generate_benchmark_json(memory_data: dict[int, float], C: float, R: float, r
             "name": f"idle_memory_{cores}core_mib",
             "value": round(actual, 2),
             "unit": "MiB",
-            "extra": f"Idle memory at {cores} core(s); predicted={predicted:.1f} MiB, error={error_pct:.1f}%"
+            "extra": f"Idle memory at {cores} core(s); predicted={predicted:.1f} MiB, error={error_pct:.1f}%",
+            "facets": {"os": "linux", "cores": str(cores)},
         })
     
     return benchmark_data
